@@ -10,7 +10,7 @@ document.body.style.setProperty('--forest', 'url("' + forest + '")');
 document.body.style.setProperty('--ground-anchor', -groundAnchor*100+'%');
 const rewardById = Object.fromEntries(rewards.map(reward => [reward.id, reward]));
 const sizes = {tree:19, flowers:16, fountain:14, pond:17, house:16, lights:13,
-  bridge:14, animal:11, arch:16, decor:11, magic:9, herbs:12, fireflies:11, bench:14};
+  bridge:14, animal:9.8, arch:16, decor:11, magic:9, herbs:12, fireflies:11, bench:14};
 let timer = null;
 
 function button(label, handler, {className='', disabled=false, aria=label} = {}) {
@@ -135,6 +135,43 @@ function effectDots(parent, className, count) {
   parent.append(effect);
 }
 
+// Water edges and swim loops are measured on each pond illustration.
+const pondWater = [
+  {edge:'35% 50%, 57% 46%, 77% 48%, 84% 56%, 73% 64%, 57% 71%, 38% 65%', center:[57,58], radius:[13,5], slope:-.10},
+  {edge:'32% 57%, 49% 52%, 63% 45%, 77% 44%, 83% 51%, 71% 60%, 56% 66%, 44% 73%, 30% 68%', center:[54,58], radius:[15,4], slope:-.31},
+  {edge:'36% 61%, 42% 52%, 56% 45%, 65% 48%, 72% 61%, 66% 72%, 52% 75%, 37% 71%', center:[54,61], radius:[10,6], slope:-.13},
+  {edge:'25% 31%, 40% 28%, 51% 40%, 65% 30%, 80% 31%, 83% 48%, 69% 64%, 53% 80%, 40% 67%, 26% 52%', center:[55,52], radius:[15,8], slope:-.20},
+  {edge:'17% 56%, 32% 46%, 54% 42%, 69% 33%, 86% 42%, 87% 61%, 67% 72%, 39% 77%, 24% 67%', center:[53,57], radius:[21,7], slope:-.23},
+];
+
+function animatePond(parent, index) {
+  const {edge,center:[x,y],radius:[rx,ry],slope}=pondWater[index];
+  const water=node('div','pond-water');
+  water.style.clipPath='polygon('+edge+')';
+  water.style.setProperty('--ripple-x',x+'%');
+  water.style.setProperty('--ripple-y',y+'%');
+  effectDots(water,'ripples',3);
+  const fish=sprite('variants',15);
+  fish.classList.add('fish');
+  fish.style.left=x+'%';
+  fish.style.top=y+'%';
+  water.append(fish);
+  parent.append(water);
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const frames=Array.from({length:49},(_,i)=>{
+    const angle=i/48*2*Math.PI;
+    const along=Math.cos(angle)*rx;
+    const facing=Math.tanh(Math.sin(angle)*7);
+    return {
+      left:(x+along)+'%',
+      top:(y+along*slope+Math.sin(angle)*ry)+'%',
+      scale:(facing*.98)+' 1',
+    };
+  });
+  const duration=9800;
+  fish.animate(frames,{duration,iterations:Infinity}).currentTime=performance.now()%duration;
+}
+
 function objectLayer(object,{ghost=false,arriving=false}={}) {
   const {id,choices,point}=object;
   if(id==='butterflies' && !ghost) return flyingButterfly(object);
@@ -166,12 +203,7 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
     content.append(artFor(id,reward.options.indexOf(choices[0])));
   }
   if(ghost) return element;
-  if(id==='pond') {
-    effectDots(content,'ripples',3);
-    const fish=sprite('variants',15);
-    fish.classList.add('fish');
-    content.append(fish);
-  }
+  if(id==='pond') animatePond(content,reward.options.indexOf(choices[0]));
   if(id==='decor') effectDots(content,'spark',4);
   if(id==='fireflies') effectDots(content,'fireflies',10);
   return element;

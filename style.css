@@ -56,10 +56,10 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 .object .sprite { transform-origin: 50% 77%; }
 .effect { position: absolute; inset: 0; pointer-events: none; }
 .effect i { position: absolute; display: block; }
-.ripples i { left: 43%; top: 58%; width: 20%; height: 10%; border: 1px solid #e5f5dfba; border-radius: 50%; animation: ripple 2.5s ease-out infinite; animation-delay: calc(var(--i) * -.8s); }
+.pond-water { position: absolute; inset: 0; pointer-events: none; }
+.ripples i { left: var(--ripple-x); top: var(--ripple-y); translate: -50% -50%; width: 15%; height: 7%; border: 1px solid #e5f5df85; border-radius: 50%; animation: ripple 2.5s ease-out infinite; animation-delay: calc(var(--i) * -.8s); }
 @keyframes ripple { from { scale: .3; opacity: 1; } to { scale: 1.8; opacity: 0; } }
-.fish { position: absolute; width: 25%; left: 35%; top: 45%; animation: swim 5s ease-in-out infinite alternate; }
-@keyframes swim { to { transform: translate(70%,27%); } }
+.pond-water .fish { position: absolute; width: 10%; translate: -50% -50%; transform-origin: center; opacity: .70; filter: saturate(.75); }
 .spark i,.fireflies i,.glade-lights i { width: clamp(2px,.4vw,5px); aspect-ratio: 1; border-radius: 50%; background: #fff4aa; box-shadow: 0 0 7px 2px #ffd66f8c; left: calc(10% + mod(var(--i) * 17,79) * 1%); top: calc(22% + mod(var(--i) * 19,56) * 1%); animation: drift 4.2s ease-in-out infinite alternate; animation-delay: calc(var(--i) * -.36s); }
 @keyframes drift { 0%,12% { transform: translate(-.4em,.5em); opacity: .12; } 66% { opacity: .95; } to { transform: translate(.8em,-.7em); opacity: .22; } }
 .object.butterflies, .object.butterfly-flight { width: clamp(18px,3.5%,46px); }
@@ -95,11 +95,11 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 .sprite.card-art { background-size: 200% 200%; }
 .activity .card-art { width: min(75vw,67dvh,620px); }
 
-.board { --dock: clamp(112px,22dvh,172px); grid-template-rows: minmax(0,1fr) var(--dock); }
-.tray { width: 100%; height: 100%; max-height: none; }
-.options { flex-wrap: nowrap; overflow-x: auto; justify-content: safe center; padding: 3px .4rem; }
-.option { flex: 0 0 auto; grid-template-rows: auto auto; min-width: 76px; }
-.option .sprite { width: clamp(40px,8vh,76px); }
+.board { --dock: clamp(137px,22dvh,172px); grid-template-rows: minmax(0,1fr) var(--dock); }
+.tray { width: 100%; height: 100%; max-height: none; display: flex; flex-direction: column; }
+.options { flex-wrap: nowrap; flex: 1; align-items: flex-start; overflow-x: auto; justify-content: safe center; padding: 4px .45rem .45rem; }
+.option { flex: 0 0 auto; grid-template-rows: auto auto; min-width: 76px; row-gap: 2px; padding-top: .25rem; }
+.option .sprite { width: clamp(32px,calc(var(--dock) - 91px),70px); }
 .place-tip { margin: -.15rem 0 .3rem; font-size: .85rem; color: #4e5749; }
 .place-tip:empty { display: none; }
 .prompt { font-weight: 600; }
