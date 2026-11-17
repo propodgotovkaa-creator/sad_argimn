@@ -10,7 +10,7 @@ document.body.style.setProperty('--forest', 'url("' + forest + '")');
 document.body.style.setProperty('--ground-anchor', -groundAnchor*100+'%');
 const rewardById = Object.fromEntries(rewards.map(reward => [reward.id, reward]));
 const sizes = {tree:19, flowers:16, fountain:14, pond:17, house:16, lights:13,
-  bridge:14, butterflies:10, animal:11, arch:16, decor:11, magic:9, herbs:12, fireflies:11, bench:14};
+  bridge:14, animal:11, arch:16, decor:11, magic:9, herbs:12, fireflies:11, bench:14};
 let timer = null;
 
 function button(label, handler, {className='', disabled=false, aria=label} = {}) {
@@ -139,9 +139,8 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
   const {id,choices,point}=object;
   if(id==='butterflies' && !ghost) return flyingButterfly(object);
   const reward=rewardById[id];
-  const restingFox=id==='animal' && choices[0]==='Лисёнок';
   const element=node('div','object '+id);
-  element.style.width=sizes[id]+'%';
+  if(id!=='butterflies') element.style.width=sizes[id]+'%';
   position(element,point);
   element.setAttribute('role','img');
   element.setAttribute('aria-label',[reward.name,...choices].join(', '));
@@ -150,7 +149,7 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
     element.setAttribute('aria-hidden','true');
   }
   const content=node('div','object-content');
-  if(arriving && !restingFox) content.classList.add('arriving');
+  if(arriving && id!=='animal') content.classList.add('arriving');
   element.append(content);
   if(id==='flowers') {
     const bed=sprite('choices',15);
@@ -164,9 +163,7 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
       content.append(flower);
     });
   } else {
-    const artwork=artFor(id,reward.options.indexOf(choices[0]));
-    if(!ghost && id==='animal' && !restingFox) artwork.classList.add('wander');
-    content.append(artwork);
+    content.append(artFor(id,reward.options.indexOf(choices[0])));
   }
   if(ghost) return element;
   if(id==='pond') {

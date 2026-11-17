@@ -62,8 +62,8 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 @keyframes swim { to { transform: translate(70%,27%); } }
 .spark i,.fireflies i,.glade-lights i { width: clamp(2px,.4vw,5px); aspect-ratio: 1; border-radius: 50%; background: #fff4aa; box-shadow: 0 0 7px 2px #ffd66f8c; left: calc(10% + mod(var(--i) * 17,79) * 1%); top: calc(22% + mod(var(--i) * 19,56) * 1%); animation: drift 4.2s ease-in-out infinite alternate; animation-delay: calc(var(--i) * -.36s); }
 @keyframes drift { 0%,12% { transform: translate(-.4em,.5em); opacity: .12; } 66% { opacity: .95; } to { transform: translate(.8em,-.7em); opacity: .22; } }
+.object.butterflies, .object.butterfly-flight { width: clamp(18px,3.5%,46px); }
 .object.butterfly-flight {
-  width: clamp(34px,8%,112px);
   transform: translate(-50%,-50%);
   filter: drop-shadow(0 2px 4px #27322049);
 }
@@ -74,8 +74,6 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 .butterfly-center { clip-path: inset(0 48%); }
 @keyframes flap-left { from { transform: rotateY(-7deg); } to { transform: rotateY(69deg); filter: brightness(.78); } }
 @keyframes flap-right { from { transform: rotateY(7deg); } to { transform: rotateY(-69deg); filter: brightness(.78); } }
-.wander { animation: hop 3.2s ease-in-out infinite alternate; }
-@keyframes hop { 0%,12% { transform: translate(-15%,0); } 28% { transform: translate(0,-13%); } 46%,65% { transform: translate(14%,0); } 80% { transform: translate(23%,-10%); } to { transform: translate(33%,0); } }
 .magic-wave { position: absolute; z-index: 102; inset: -30%; background: radial-gradient(ellipse at center,transparent 38%,#ffdb8244 56%,transparent 63%); animation: wave 1.2s ease-out both; pointer-events: none; }
 @keyframes wave { from { scale: .1; opacity: .3; } 40% { opacity: .9; } to { scale: 1.25; opacity: 0; } }
 .glade-lights { z-index: 103; }
