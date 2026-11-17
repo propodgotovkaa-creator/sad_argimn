@@ -1,16 +1,16 @@
 import { GardenGame, exercises, minimumExercises, rewards } from './game.js';
-import { forest, cardSheets, objects, variants, choices, extras, fairyArt } from './art.js';
+import { forest, cardSheets, objects, variants, choices, extras, fairyArt, turkeyArt, benches } from './art.js';
 import { addWater } from './water.js';
 
 const app = document.querySelector('#app');
 const game = new GardenGame();
-const artwork = { objects, variants, choices, extras };
+const artwork = { objects, variants, choices, extras, benches };
 const groundAnchor = .88;
 document.body.style.setProperty('--forest', 'url("' + forest + '")');
 document.body.style.setProperty('--ground-anchor', -groundAnchor*100+'%');
 const rewardById = Object.fromEntries(rewards.map(reward => [reward.id, reward]));
 const sizes = {tree:19, flowers:16, fountain:14, pond:17, house:16, lights:13,
-  bridge:14, butterflies:10, animal:11, arch:16, decor:11, magic:9, herbs:12, fireflies:11};
+  bridge:14, butterflies:10, animal:11, arch:16, decor:11, magic:9, herbs:12, fireflies:11, bench:14};
 let timer = null;
 
 function button(label, handler, {className='', disabled=false, aria=label} = {}) {
@@ -31,19 +31,26 @@ function node(tag, className, content) {
   return element;
 }
 
-function sprite(sheet, index) {
+function sprite(sheet, index, columns=4) {
   const element = node('span', 'sprite');
+  const tile = 100/(columns-1);
   element.style.backgroundImage = 'url("' + artwork[sheet] + '")';
-  element.style.backgroundPosition = (index % 4) * 100 / 3 + '% ' + Math.floor(index / 4) * 100 / 3 + '%';
+  element.style.backgroundSize = (columns*100)+'% '+(columns*100)+'%';
+  element.style.backgroundPosition = (index%columns)*tile+'% '+Math.floor(index/columns)*tile+'%';
   element.setAttribute('aria-hidden', 'true');
   return element;
 }
 
 function cardArt(id) {
   const image=node('span','sprite card-art');
-  const frame=id%4;
-  image.style.backgroundImage='url("'+cardSheets[Math.floor(id/4)]+'")';
-  image.style.backgroundPosition=(frame%2)*100+'% '+Math.floor(frame/2)*100+'%';
+  if(exercises[id]==='Индюк') {
+    image.style.backgroundImage='url("'+turkeyArt+'")';
+    image.style.backgroundSize='100% 100%';
+  } else {
+    const frame=id%4;
+    image.style.backgroundImage='url("'+cardSheets[Math.floor(id/4)]+'")';
+    image.style.backgroundPosition=(frame%2)*100+'% '+Math.floor(frame/2)*100+'%';
+  }
   image.setAttribute('aria-hidden','true');
   return image;
 }
@@ -102,9 +109,10 @@ const extraArt = {
   lights:[['choices',12],['choices',13],['choices',14]],
   bridge:[['choices',8],['choices',9],['choices',10]],
   butterflies:[['objects',7],['variants',6],['variants',7],['extras',10],['extras',11]],
-  animal:[['objects',8],['variants',8],['variants',9],['variants',10],['extras',12],['extras',13]],
+  animal:[['variants',8],['variants',9],['variants',10],['extras',12],['extras',13]],
   arch:[['objects',9],['extras',14],['extras',15]],
   decor:[['objects',10],['variants',11],['variants',12],['variants',13],['variants',14]],
+  bench:[['benches',0,2],['benches',1,2],['benches',2,2]],
 };
 const fallbackArt = { magic:11, herbs:12, fireflies:13 };
 const colors = { magic:[0,186,240], herbs:[0,71,315], fireflies:[0,57,168] };
@@ -129,7 +137,9 @@ function effectDots(parent, className, count) {
 
 function objectLayer(object,{ghost=false,arriving=false}={}) {
   const {id,choices,point}=object;
+  if(id==='butterflies' && !ghost) return flyingButterfly(object);
   const reward=rewardById[id];
+  const restingFox=id==='animal' && choices[0]==='Лисёнок';
   const element=node('div','object '+id);
   element.style.width=sizes[id]+'%';
   position(element,point);
@@ -140,7 +150,7 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
     element.setAttribute('aria-hidden','true');
   }
   const content=node('div','object-content');
-  if(arriving) content.classList.add('arriving');
+  if(arriving && !restingFox) content.classList.add('arriving');
   element.append(content);
   if(id==='flowers') {
     const bed=sprite('choices',15);
@@ -155,8 +165,7 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
     });
   } else {
     const artwork=artFor(id,reward.options.indexOf(choices[0]));
-    if(!ghost && id==='butterflies') artwork.classList.add('flutter');
-    if(!ghost && id==='animal') artwork.classList.add('wander');
+    if(!ghost && id==='animal' && !restingFox) artwork.classList.add('wander');
     content.append(artwork);
   }
   if(ghost) return element;
@@ -166,14 +175,60 @@ function objectLayer(object,{ghost=false,arriving=false}={}) {
     fish.classList.add('fish');
     content.append(fish);
   }
-  if(id==='bridge') {
-    const rabbit=sprite('objects',8);
-    rabbit.classList.add('crossing');
-    content.append(rabbit);
-  }
   if(id==='decor') effectDots(content,'spark',4);
   if(id==='fireflies') effectDots(content,'fireflies',10);
   return element;
+}
+
+let butterflyStartedAt=null;
+const flightStops=[[75,73],[91,46],[77,20],[51,13],[22,25],[9,56],[33,83]];
+
+function flightCoordinate(points, segment, progress, axis) {
+  const at=offset=>points[(segment+offset+points.length)%points.length][axis];
+  const from=at(0);
+  const to=at(1);
+  const incoming=(to-at(-1))/2;
+  const outgoing=(at(2)-from)/2;
+  const t=progress;
+  return (2*t**3-3*t**2+1)*from + (t**3-2*t**2+t)*incoming
+    + (-2*t**3+3*t**2)*to + (t**3-t**2)*outgoing;
+}
+
+function flyingButterfly({id,choices,point}) {
+  const butterfly=node('div','object butterfly-flight');
+  butterfly.setAttribute('role','img');
+  butterfly.setAttribute('aria-label','Бабочка, '+choices[0]);
+  const index=rewardById[id].options.indexOf(choices[0]);
+  const body=node('div','butterfly-body');
+  for(const part of ['left-wing','right-wing','butterfly-center']) {
+    const layer=artFor(id,index);
+    layer.classList.add(part);
+    body.append(layer);
+  }
+  butterfly.append(body);
+  position(butterfly,point);
+  butterfly.style.zIndex='108';
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return butterfly;
+
+  butterflyStartedAt??=performance.now();
+  const route=[point,...flightStops];
+  const duration=16000;
+  function frame(now) {
+    if(!butterfly.isConnected) return;
+    const progress=((now-butterflyStartedAt)%duration)/duration*route.length;
+    const segment=Math.floor(progress);
+    const t=progress-segment;
+    const x=flightCoordinate(route,segment,t,0);
+    const y=flightCoordinate(route,segment,t,1);
+    const dx=flightCoordinate(route,segment,t+.01,0)-x;
+    butterfly.style.left=Math.max(3,Math.min(97,x))+'%';
+    butterfly.style.top=Math.max(5,Math.min(95,y))+'%';
+    body.style.rotate=Math.max(-25,Math.min(25,dx*35))+'deg';
+    body.style.scale=String(.68+Math.max(0,Math.min(100,y))*.0045);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  return butterfly;
 }
 
 function position(element, point) {
@@ -340,6 +395,7 @@ function play(s) {
 
 function render(focusId) {
   const s = game.state;
+  if(s.phase==='menu') butterflyStartedAt=null;
   if(s.index!==previewIndex || s.phase==='menu') {
     previewIndex=s.index;
     previewPoint=defaultPreview;
