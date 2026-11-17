@@ -1,5 +1,6 @@
 import { GardenGame, exercises, rewards } from './game.js';
-import { forest, cards, objects, variants } from './art.js';
+import { forest, cards, objects, variants, soil } from './art.js';
+import { addWater } from './water.js';
 
 const app = document.querySelector('#app');
 const game = new GardenGame();
@@ -11,7 +12,7 @@ const plots = {
   'bed-left': [23, 76], 'bed-right': [76, 79],
   fountain: [60, 59], pond: [84, 59], house: [37, 58],
   'lights-left': [39, 80], 'lights-right': [60, 83],
-  stream: [57, 47],
+  stream: [61, 48],
   'butterfly-left': [20, 64], 'butterfly-right': [74, 55],
   'animal-left': [13, 72], 'animal-right': [88, 73],
   arch: [49, 73],
@@ -25,6 +26,8 @@ const sizes = {tree:19, flowers:16, fountain:14, pond:17, house:16, lights:13,
 const color = {flowers:[0,155,35], lights:[0,76,156], magic:[0,190,260], fireflies:[0,60,168]};
 let multiple = [];
 let timer = null;
+const wateringEffects = new Set(['grow','bloom','sprout']);
+const plantTypes = new Set(['tree','flowers','herbs']);
 
 function button(label, handler, {className='', disabled=false, aria=label} = {}) {
   const element = document.createElement('button');
@@ -134,10 +137,7 @@ function objectLayer(object, s) {
   element.setAttribute('role','img');
   element.setAttribute('aria-label', [rewardById[id].name, ...choices.flat()].join(', '));
   const ready = s.draft !== object || effects.length || active;
-  if (id === 'tree' && !ready) {
-    element.append(node('span','seed'));
-    return element;
-  }
+  if (plantTypes.has(id) && !ready) return null;
   const drawing = artFor(object);
   const first = rewardById[id].steps[0].options.indexOf(choices[0]?.[0]);
   if (['house','bridge','arch','pond','flowers'].includes(id)) {
@@ -162,7 +162,6 @@ function objectLayer(object, s) {
   } else {
     element.append(drawing);
   }
-  if (id === 'fountain' && ready) effectDots(element,'water',11);
   if (id === 'pond' && ready) {
     effectDots(element,'ripples',3);
     const resident = choices[1]?.[0];
@@ -192,6 +191,57 @@ function objectLayer(object, s) {
   return element;
 }
 
+function targetPosition(element, point) {
+  element.style.left=point[0]+'%';
+  element.style.top=point[1]+'%';
+}
+
+function wateringCan(scene, point) {
+  const target = button('', () => refresh(() => game.activate()), {
+    className:'spot watering-target', aria:'Грядка',
+  });
+  targetPosition(target,point);
+  target.hidden=true;
+  const tool = button('', () => {
+    target.hidden=false;
+    target.focus({preventScroll:true});
+  },{className:'watering-tool',aria:'Взять лейку'});
+  tool.id='next-control';
+  targetPosition(tool,[point[0]<35?point[0]+17:point[0]-17,Math.min(91,point[1]+11)]);
+  tool.append(sprite('objects',14));
+  scene.append(target,tool);
+
+  let dragging=null;
+  let dragged=false;
+  tool.addEventListener('pointerdown',event => {
+    if(event.button!==0 || !event.isPrimary) return;
+    dragging={id:event.pointerId,x:event.clientX,y:event.clientY};
+    dragged=false;
+    tool.setPointerCapture(event.pointerId);
+    target.hidden=false;
+  });
+  tool.addEventListener('pointermove',event => {
+    if(dragging?.id!==event.pointerId) return;
+    if(Math.hypot(event.clientX-dragging.x,event.clientY-dragging.y)<5&&!dragged) return;
+    dragged=true;
+    const rect=scene.getBoundingClientRect();
+    tool.classList.add('held');
+    const x=Math.max(5,Math.min(95,100*(event.clientX-rect.left)/rect.width));
+    const y=Math.max(8,Math.min(92,100*(event.clientY-rect.top)/rect.height));
+    targetPosition(tool,[x,y]);
+  });
+  tool.addEventListener('pointerup',event => {
+    if(dragging?.id!==event.pointerId) return;
+    dragging=null;
+    if(!dragged) return;
+    const rect=target.getBoundingClientRect();
+    const distance=Math.hypot(event.clientX-(rect.left+rect.width/2),event.clientY-(rect.top+rect.height/2));
+    if(distance <= Math.max(38,rect.width*.75)) refresh(() => game.activate());
+    else render('next-control');
+  });
+  tool.addEventListener('pointercancel',() => render('next-control'));
+}
+
 function garden(s) {
   const scene = node('div','garden');
   const dusk = ['finale','finished','view'].includes(s.phase);
@@ -200,7 +250,8 @@ function garden(s) {
   scene.classList.toggle('enchanted',enchanted);
   scene.classList.toggle('darken',s.phase==='finale');
   scene.append(node('div','landscape'));
-  for (const object of [...s.objects, ...(s.draft?.plot || s.draft?.id==='magic' && s.animation ? [s.draft] : [])]) {
+  const visible=[...s.objects,...(s.draft?.plot || s.draft?.id==='magic' && s.animation ? [s.draft] : [])];
+  for (const object of visible) {
     const item = objectLayer(object,s);
     if (item) scene.append(item);
   }
@@ -215,6 +266,39 @@ function garden(s) {
     scene.append(fairy);
   }
   if (s.animation?.effect==='wave') scene.append(node('div','magic-wave'));
+  const fountains=visible
+    .filter(object => object.id==='fountain' && (object.effects.includes('flow') || s.animation?.effect==='flow'))
+    .map(object => ({point:plots[object.plot],size:sizes.fountain,
+      variant:rewardById.fountain.steps[0].options.indexOf(object.choices[0][0])}));
+  const pour=wateringEffects.has(s.animation?.effect) ? plots[s.draft.plot] : null;
+  if (s.draft?.plot && plantTypes.has(s.draft.id)) {
+    const earth=node('img','soil'+(pour?' wet':''));
+    earth.src=soil;
+    earth.alt='';
+    const point=plots[s.draft.plot];
+    targetPosition(earth,point);
+    earth.style.zIndex=point[1]-1;
+    earth.style.width=s.draft.id==='tree'?'8%':'10%';
+    scene.append(earth);
+  }
+  if (pour) {
+    const can=sprite('objects',14);
+    can.classList.add('pouring-can');
+    targetPosition(can,pour);
+    scene.append(can);
+  }
+  addWater(scene,{fountains,pour});
+  if(s.step?.kind==='act' && wateringEffects.has(s.step.effect)) {
+    wateringCan(scene,plots[s.draft.plot]);
+  }
+  if(s.step?.kind==='act' && s.step.effect==='flow') {
+    const [x,y]=plots[s.draft.plot];
+    const crystal=button('',()=>refresh(()=>game.activate()),{className:'water-crystal',aria:'Коснуться кристалла фонтана'});
+    crystal.id='next-control';
+    crystal.append(sprite('objects',10));
+    targetPosition(crystal,[x+8,y+4]);
+    scene.append(crystal);
+  }
   if (s.step?.kind === 'place') {
     s.step.plots.forEach((plot,index) => {
       const spot = button('', () => refresh(() => game.place(plot), 'next-control'),
@@ -232,6 +316,7 @@ function choiceTray(s) {
   const step = s.step;
   const tray = node('section','tray');
   if (step.kind === 'act') {
+    if (wateringEffects.has(step.effect) || step.effect==='flow') return null;
     const action = button(step.label, () => refresh(() => game.activate()), {className:'primary'});
     action.id = 'next-control';
     tray.append(action);
@@ -281,7 +366,10 @@ function play(s) {
   if (s.phase==='view') header.append(button('Играть ещё',
     () => refresh(() => game.restart(),'exercise-0')));
   board.append(header);
-  if (s.phase==='garden') board.append(choiceTray(s));
+  if (s.phase==='garden') {
+    const tray=choiceTray(s);
+    if(tray) board.append(tray);
+  }
   if (s.phase==='exercise' || s.phase==='finished') {
     const overlay = node('div','overlay');
     const card = node('section','activity');
@@ -312,7 +400,8 @@ function render(focusId) {
     document.getElementById('option-0'))?.focus({preventScroll:true});
   if (s.animation && !timer) {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const duration = reduced ? 60 : s.animation.effect === 'dusk' ? 3300 : 1200;
+    const effect=s.animation.effect;
+    const duration = reduced ? 350 : effect === 'dusk' ? 3300 : wateringEffects.has(effect) ? 2520 : 1200;
     timer = setTimeout(() => {
       timer = null;
       refresh(() => game.completeAnimation(s.animation.token),'done');

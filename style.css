@@ -68,10 +68,10 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 .roof { top: 31%; left: 36%; width: 29%; height: 10%; border-radius: 100% 50% 0 0; background: #777f3695; mix-blend-mode: multiply; }
 .roof-1 { top: 27%; border-radius: 75% 75% 20% 20%; }
 .roof-2 { rotate: -16deg; }
-.little-door { top: 56%; left: 61%; width: 11%; height: 20%; border-radius: 55% 55% 15% 15%; background: repeating-linear-gradient(90deg,#78523c 0 3px,#573e30 4px 5px); box-shadow: 1px 1px 2px #41342b; }
+.little-door { top: 53%; left: 53%; width: 12%; height: 28%; border-radius: 55% 55% 15% 15%; background: repeating-linear-gradient(90deg,#78523c 0 3px,#573e30 4px 5px); box-shadow: 1px 1px 2px #41342b; }
 .door-0 { border-radius: 50%; }
 .door-2 { border: 2px ridge #a47b49; }
-.little-window { left: 37%; top: 55%; width: 8%; height: 9%; border-radius: 30%; border: 1px solid #583f2b; background: #80754f; }
+.little-window { left: 31%; top: 57%; width: 8%; height: 9%; border-radius: 30%; border: 1px solid #583f2b; background: #80754f; }
 .window-0 { border-inline: 3px solid #66805d; }
 .window-1 { border-inline: 3px solid #b88d79; }
 .window-2 { border-bottom: 3px solid #aa7d65; }
@@ -90,8 +90,6 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 @keyframes flicker { 0%,25% { opacity: 0; } 55% { opacity: .7; } 70% { opacity: .15; } }
 .effect { position: absolute; inset: 0; pointer-events: none; }
 .effect i { position: absolute; display: block; }
-.water i { left: 50%; top: 35%; width: 2%; aspect-ratio: 1; background: #daf8ee; border-radius: 50%; animation: droplets 1.15s linear infinite; animation-delay: calc(var(--i) * -.1s); --dx: calc((mod(var(--i),7) - 3) * .45em); }
-@keyframes droplets { 0% { transform: translate(0,0); opacity: .6; } 35% { transform: translate(calc(var(--dx) * .55),-.65em); opacity: 1; } to { transform: translate(var(--dx),1.6em); opacity: 0; } }
 .ripples i { left: 43%; top: 58%; width: 20%; height: 10%; border: 1px solid #e5f5dfba; border-radius: 50%; animation: ripple 2.5s ease-out infinite; animation-delay: calc(var(--i) * -.8s); }
 @keyframes ripple { from { scale: .3; opacity: 1; } to { scale: 1.8; opacity: 0; } }
 .fish,.crossing { position: absolute; width: 25%; left: 35%; top: 45%; animation: swim 5s ease-in-out infinite alternate; }
@@ -126,3 +124,53 @@ h2 { font-size: clamp(1.7rem,4vw,2.8rem); }
 .garden { width: min(100cqw,184cqh); margin: 0; align-self: center; }
 .tray { max-height: 48dvh; overflow: auto; }
 button.spot:hover:not(:disabled) { background: #e9ca8277; border-color: #fff0c2; }
+.water-canvas {
+  display: block; position: absolute; inset: 0; z-index: 105;
+  width: 100%; height: 100%; pointer-events: none;
+}
+.watering-tool, .water-crystal {
+  display: block; position: absolute; z-index: 113;
+  width: 12.5%; min-width: 52px; min-height: 0; padding: 0;
+  transform: translate(-50%,-50%); border: 0; background: transparent;
+  filter: drop-shadow(0 3px 4px #231d17a0) drop-shadow(0 0 7px #fae3a099);
+  touch-action: none; cursor: grab;
+}
+.watering-tool:hover:not(:disabled), .water-crystal:hover:not(:disabled) {
+  background: transparent; filter: drop-shadow(0 4px 5px #211c13ad) drop-shadow(0 0 9px #ffe7a7d8);
+}
+.watering-tool.held { cursor: grabbing; z-index: 115; }
+.watering-tool .sprite, .water-crystal .sprite { pointer-events: none; }
+.water-crystal { width: 7%; min-width: 44px; cursor: pointer; animation: glint 2.6s ease-in-out infinite; }
+@keyframes glint { 50% { filter: drop-shadow(0 0 11px #c8affadd); } }
+.watering-target { width: clamp(48px,8vw,90px); height: clamp(48px,8vw,90px); }
+.watering-target[hidden] { display: none; }
+.pouring-can {
+  width: 12.5%; position: absolute; z-index: 106; pointer-events: none;
+  translate: -106% -113%;
+  rotate: var(--tilt, 0deg);
+  animation: tip-can 1.81s cubic-bezier(.25,.65,.45,1) both;
+  filter: drop-shadow(0 2px 4px #201d1599);
+}
+@keyframes tip-can {
+  0% { opacity: .25; rotate: -12deg; }
+  18%,73% { opacity: 1; rotate: 35deg; }
+  87% { opacity: .9; rotate: 6deg; }
+  100% { opacity: 0; rotate: 0deg; }
+}
+.soil {
+  position: absolute; min-width: 22px; height: auto;
+  transform: translate(-50%,-50%); pointer-events: none;
+}
+.soil.wet { animation: damp-earth 2.4s ease both; }
+@keyframes damp-earth {
+  0%,13% { filter: none; opacity: 1; }
+  55% { filter: brightness(.68) saturate(1.13); opacity: 1; }
+  100% { filter: brightness(.68) saturate(1.13); opacity: .2; }
+}
+.effect-grow > .sprite, .effect-bloom > .sprite, .effect-sprout > .sprite {
+  animation-delay: 1.02s; animation-fill-mode: both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .effect-grow > .sprite, .effect-bloom > .sprite, .effect-sprout > .sprite { animation-delay: 0s; }
+  .pouring-can { animation: none; rotate: 35deg; }
+}
