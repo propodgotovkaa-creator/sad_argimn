@@ -7,3 +7,4 @@ export const extras = './assets/extras-v3.webp';
 export const fairyArt = './assets/fairy-v3.webp';
 export const turkeyArt = './assets/turkey-v4.webp';
 export const benches = './assets/benches-v4.webp';
+export const arches = './assets/arches.webp';

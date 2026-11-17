@@ -1,10 +1,10 @@
 import { GardenGame, exercises, minimumExercises, rewards } from './game.js';
-import { forest, cardSheets, objects, variants, choices, extras, fairyArt, turkeyArt, benches } from './art.js';
+import { forest, cardSheets, objects, variants, choices, extras, fairyArt, turkeyArt, benches, arches } from './art.js';
 import { addWater } from './water.js';
 
 const app = document.querySelector('#app');
 const game = new GardenGame();
-const artwork = { objects, variants, choices, extras, benches };
+const artwork = { objects, variants, choices, extras, benches, arches };
 const groundAnchor = .88;
 document.body.style.setProperty('--forest', 'url("' + forest + '")');
 document.body.style.setProperty('--ground-anchor', -groundAnchor*100+'%');
@@ -110,7 +110,7 @@ const extraArt = {
   bridge:[['choices',8],['choices',9],['choices',10]],
   butterflies:[['objects',7],['variants',6],['variants',7],['extras',10],['extras',11]],
   animal:[['variants',8],['variants',9],['variants',10],['extras',12],['extras',13]],
-  arch:[['objects',9],['extras',14],['extras',15]],
+  arch:[['arches',0,2],['arches',1,2],['arches',2,2]],
   decor:[['objects',10],['variants',11],['variants',12],['variants',13],['variants',14]],
   bench:[['benches',0,2],['benches',1,2],['benches',2,2]],
 };
