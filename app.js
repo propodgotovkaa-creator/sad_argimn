@@ -1,33 +1,17 @@
-import { GardenGame, exercises, rewards } from './game.js';
-import { forest, cards, objects, variants, soil } from './art.js';
+import { GardenGame, exercises, minimumExercises, rewards } from './game.js';
+import { forest, cardSheets, objects, variants, choices, extras, fairyArt } from './art.js';
 import { addWater } from './water.js';
 
 const app = document.querySelector('#app');
 const game = new GardenGame();
-const artwork = { cards, objects, variants };
+const artwork = { objects, variants, choices, extras };
+const groundAnchor = .88;
 document.body.style.setProperty('--forest', 'url("' + forest + '")');
+document.body.style.setProperty('--ground-anchor', -groundAnchor*100+'%');
 const rewardById = Object.fromEntries(rewards.map(reward => [reward.id, reward]));
-const plots = {
-  'tree-left': [26, 44], 'tree-right': [68, 42],
-  'bed-left': [23, 76], 'bed-right': [76, 79],
-  fountain: [60, 59], pond: [84, 59], house: [37, 58],
-  'lights-left': [39, 80], 'lights-right': [60, 83],
-  stream: [61, 48],
-  'butterfly-left': [20, 64], 'butterfly-right': [74, 55],
-  'animal-left': [13, 72], 'animal-right': [88, 73],
-  arch: [49, 73],
-  'decor-left': [12, 87], 'decor-right': [89, 89],
-  'herbs-left': [29, 91], 'herbs-right': [70, 92],
-  'fireflies-left': [14, 48], 'fireflies-right': [86, 45],
-  magic: [48, 28],
-};
 const sizes = {tree:19, flowers:16, fountain:14, pond:17, house:16, lights:13,
   bridge:14, butterflies:10, animal:11, arch:16, decor:11, magic:9, herbs:12, fireflies:11};
-const color = {flowers:[0,155,35], lights:[0,76,156], magic:[0,190,260], fireflies:[0,60,168]};
-let multiple = [];
 let timer = null;
-const wateringEffects = new Set(['grow','bloom','sprout']);
-const plantTypes = new Set(['tree','flowers','herbs']);
 
 function button(label, handler, {className='', disabled=false, aria=label} = {}) {
   const element = document.createElement('button');
@@ -55,13 +39,22 @@ function sprite(sheet, index) {
   return element;
 }
 
+function cardArt(id) {
+  const image=node('span','sprite card-art');
+  const frame=id%4;
+  image.style.backgroundImage='url("'+cardSheets[Math.floor(id/4)]+'")';
+  image.style.backgroundPosition=(frame%2)*100+'% '+Math.floor(frame/2)*100+'%';
+  image.setAttribute('aria-hidden','true');
+  return image;
+}
+
 function refresh(change, target) {
   if (change()) render(target);
 }
 
 function menu(s) {
   const panel = node('section', 'menu');
-  panel.append(node('h1', '', 'Волшебный сад'), node('p', 'instruction', 'Выберите упражнения в нужном порядке'));
+  panel.append(node('h1', '', 'Волшебный сад'), node('p', 'instruction', 'Выберите минимум '+minimumExercises+' упражнений в нужном порядке. За каждое в саду появится один предмет.'));
   const grid = node('div', 'card-grid');
   exercises.forEach((label, id) => {
     const order = s.selected.indexOf(id);
@@ -69,7 +62,7 @@ function menu(s) {
     card.id = 'exercise-'+id;
     card.setAttribute('aria-pressed', String(order >= 0));
     card.title = label;
-    card.append(sprite('cards', id));
+    card.append(cardArt(id));
     if (order >= 0) card.append(node('span', 'order-tag', String(order+1)));
     grid.append(card);
   });
@@ -83,7 +76,7 @@ function menu(s) {
         {disabled:index===0, aria:exercises[id]+' раньше'});
       const right = button('›', () => refresh(() => game.move(index,index+1),'exercise-'+id),
         {disabled:index===s.selected.length-1, aria:exercises[id]+' позже'});
-      item.append(left, sprite('cards',id), right);
+      item.append(left, cardArt(id), right);
       sequence.append(item);
     });
     panel.append(sequence);
@@ -93,23 +86,34 @@ function menu(s) {
   all.id = 'all';
   const clear = button('Сбросить', () => refresh(() => game.clear(),'all'), {disabled:!s.selected.length});
   actions.append(all, clear, button('Начать', () => refresh(() => game.start(),'done'),
-    {className:'primary', disabled:!s.selected.length}));
-  panel.append(actions);
+    {className:'primary', disabled:s.selected.length<minimumExercises}));
+  const count=node('p','selection-count','Выбрано: '+s.selected.length+' из '+exercises.length);
+  count.setAttribute('aria-live','polite');
+  panel.append(actions,count);
   return panel;
 }
 
-function artFor(object, option) {
-  const { id } = object;
-  const reward = rewardById[id];
-  const first = option ?? reward.steps[0].options.indexOf(object.choices[0]?.[0]);
-  const index = Math.max(0, first);
-  const variant = {
-    tree:[3,4,5], fountain:[0,1,2], butterflies:[null,6,7], animal:[null,8,9,10],
-    decor:[null,11,12,13,14],
-  }[id]?.[index];
-  if (variant != null) return sprite('variants', variant);
-  const item = sprite('objects', rewards.indexOf(reward));
-  if (color[id]) item.style.filter = 'hue-rotate(' + color[id][index] + 'deg)';
+const extraArt = {
+  tree:[['variants',3],['variants',4],['variants',5],['extras',8],['extras',9]],
+  flowers:[['choices',3],['choices',7],['choices',11],['extras',6],['extras',7]],
+  fountain:[['variants',0],['variants',1],['variants',2],['extras',0],['extras',1]],
+  pond:[['choices',4],['choices',5],['choices',6],['extras',4],['extras',5]],
+  house:[['choices',0],['choices',1],['choices',2],['extras',2],['extras',3]],
+  lights:[['choices',12],['choices',13],['choices',14]],
+  bridge:[['choices',8],['choices',9],['choices',10]],
+  butterflies:[['objects',7],['variants',6],['variants',7],['extras',10],['extras',11]],
+  animal:[['objects',8],['variants',8],['variants',9],['variants',10],['extras',12],['extras',13]],
+  arch:[['objects',9],['extras',14],['extras',15]],
+  decor:[['objects',10],['variants',11],['variants',12],['variants',13],['variants',14]],
+};
+const fallbackArt = { magic:11, herbs:12, fireflies:13 };
+const colors = { magic:[0,186,240], herbs:[0,71,315], fireflies:[0,57,168] };
+
+function artFor(id, index) {
+  const image=extraArt[id]?.[index];
+  if (image) return sprite(...image);
+  const item=sprite('objects',fallbackArt[id]);
+  item.style.filter='hue-rotate('+colors[id][index]+'deg)';
   return item;
 }
 
@@ -118,238 +122,182 @@ function effectDots(parent, className, count) {
   for (let i=0; i<count; i++) {
     const dot = node('i', '');
     dot.style.setProperty('--i', i);
-    dot.style.setProperty('--n', count);
     effect.append(dot);
   }
   parent.append(effect);
 }
 
-function objectLayer(object, s) {
-  const point = plots[object.plot ?? object.id];
-  if (!point) return null;
-  const { id, choices, effects } = object;
-  const active = s.draft === object && s.phase === 'animating' ? s.animation.effect : '';
-  const element = node('div', 'object '+id+(active ? ' effect-'+active : ''));
-  element.style.left = point[0]+'%';
-  element.style.top = point[1]+'%';
-  element.style.width = sizes[id]+'%';
-  element.style.zIndex = point[1];
+function objectLayer(object,{ghost=false,arriving=false}={}) {
+  const {id,choices,point}=object;
+  const reward=rewardById[id];
+  const element=node('div','object '+id);
+  element.style.width=sizes[id]+'%';
+  position(element,point);
   element.setAttribute('role','img');
-  element.setAttribute('aria-label', [rewardById[id].name, ...choices.flat()].join(', '));
-  const ready = s.draft !== object || effects.length || active;
-  if (plantTypes.has(id) && !ready) return null;
-  const drawing = artFor(object);
-  const first = rewardById[id].steps[0].options.indexOf(choices[0]?.[0]);
-  if (['house','bridge','arch','pond','flowers'].includes(id)) {
-    element.classList.add('shape-'+Math.max(0,first));
+  element.setAttribute('aria-label',[reward.name,...choices].join(', '));
+  if(ghost) {
+    element.classList.add('ghost');
+    element.setAttribute('aria-hidden','true');
   }
-  if (id === 'house') {
-    const settings = choices.slice(1).map((value,index) => rewardById[id].steps[index+1].options.indexOf(value[0]));
-    drawing.style.filter = 'hue-rotate('+[0,65,276][settings[0]]+'deg)';
-    const roof = node('span','roof roof-'+Math.max(0,first));
-    const door = node('span','little-door door-'+settings[1]);
-    const window = node('span','little-window window-'+settings[2]+(ready?' lit':''));
-    element.append(drawing, roof, door, window);
-  } else if (id === 'flowers' && choices[1]?.length) {
-    choices[1].forEach((label,index) => {
-      const flower = artFor(object,rewardById[id].steps[2].options.indexOf(label));
-      flower.classList.add('flower-layer');
-      flower.style.setProperty('--offset', (index-(choices[1].length-1)/2)*24+'%');
-      element.append(flower);
+  const content=node('div','object-content');
+  if(arriving) content.classList.add('arriving');
+  element.append(content);
+  if(id==='flowers') {
+    const bed=sprite('choices',15);
+    bed.classList.add('flower-bed');
+    content.append(bed);
+    choices.forEach((option,i)=>{
+      const flower=artFor(id,reward.options.indexOf(option));
+      flower.classList.add('planted-flower');
+      flower.style.setProperty('--offset', (i-(choices.length-1)/2)*(choices.length>3?17:24)+'%');
+      flower.style.setProperty('--height', (i%2)*8+'%');
+      content.append(flower);
     });
-  } else if (['butterflies','animal','fireflies'].includes(id) && !ready) {
-    element.append(node('span','seed'));
   } else {
-    element.append(drawing);
+    const artwork=artFor(id,reward.options.indexOf(choices[0]));
+    if(!ghost && id==='butterflies') artwork.classList.add('flutter');
+    if(!ghost && id==='animal') artwork.classList.add('wander');
+    content.append(artwork);
   }
-  if (id === 'pond' && ready) {
-    effectDots(element,'ripples',3);
-    const resident = choices[1]?.[0];
-    if (resident?.includes('рыбки')) {
-      const fish = sprite('variants',15);
-      fish.classList.add('fish');
-      element.append(fish);
-    }
-    if (resident === 'Кувшинки' || resident?.includes('и рыбки')) effectDots(element,'lilies',4);
+  if(ghost) return element;
+  if(id==='pond') {
+    effectDots(content,'ripples',3);
+    const fish=sprite('variants',15);
+    fish.classList.add('fish');
+    content.append(fish);
   }
-  if (id === 'bridge' && ready) {
-    const guest = sprite('objects',8);
-    guest.classList.add('crossing');
-    element.append(guest);
+  if(id==='bridge') {
+    const rabbit=sprite('objects',8);
+    rabbit.classList.add('crossing');
+    content.append(rabbit);
   }
-  if (id === 'arch' && ready) effectDots(element,'roses',9);
-  if (id === 'lights' && ready) effectDots(element,'lamplight',2);
-  if (id === 'decor' && ready) effectDots(element,'spark',5);
-  if (id === 'butterflies' && ready) drawing.classList.add('flutter');
-  if (id === 'animal' && ready) drawing.classList.add('wander');
-  if (id === 'fireflies' && ready) effectDots(element,'fireflies',10);
-  if (id === 'herbs' && choices[0]?.length) {
-    const herb = rewardById[id].steps[0].options.indexOf(choices[0][0]);
-    drawing.style.filter = 'hue-rotate('+[0,65,315][herb]+'deg)';
-    element.style.width = (8+choices[0].length*2)+'%';
-  }
+  if(id==='decor') effectDots(content,'spark',4);
+  if(id==='fireflies') effectDots(content,'fireflies',10);
   return element;
 }
 
-function targetPosition(element, point) {
+function position(element, point) {
   element.style.left=point[0]+'%';
   element.style.top=point[1]+'%';
+  element.style.zIndex=String(Math.round(point[1]));
 }
 
-function wateringCan(scene, point) {
-  const target = button('', () => refresh(() => game.activate()), {
-    className:'spot watering-target', aria:'Грядка',
-  });
-  targetPosition(target,point);
-  target.hidden=true;
-  const tool = button('', () => {
-    target.hidden=false;
-    target.focus({preventScroll:true});
-  },{className:'watering-tool',aria:'Взять лейку'});
-  tool.id='next-control';
-  targetPosition(tool,[point[0]<35?point[0]+17:point[0]-17,Math.min(91,point[1]+11)]);
-  tool.append(sprite('objects',14));
-  scene.append(target,tool);
+const defaultPreview=[54,62];
+let previewPoint=defaultPreview;
+let lastTouch=null;
+let previewIndex=-1;
 
-  let dragging=null;
-  let dragged=false;
-  tool.addEventListener('pointerdown',event => {
-    if(event.button!==0 || !event.isPrimary) return;
-    dragging={id:event.pointerId,x:event.clientX,y:event.clientY};
-    dragged=false;
-    tool.setPointerCapture(event.pointerId);
-    target.hidden=false;
+function enablePlacement(scene,draft) {
+  const ghost=objectLayer({...draft,point:previewPoint},{ghost:true});
+  const surface=button('',()=>{},{
+    className:'placement-surface',aria:'Поставить предмет. Стрелки перемещают примерку, Ввод ставит предмет.',
   });
-  tool.addEventListener('pointermove',event => {
-    if(dragging?.id!==event.pointerId) return;
-    if(Math.hypot(event.clientX-dragging.x,event.clientY-dragging.y)<5&&!dragged) return;
-    dragged=true;
-    const rect=scene.getBoundingClientRect();
-    tool.classList.add('held');
-    const x=Math.max(5,Math.min(95,100*(event.clientX-rect.left)/rect.width));
-    const y=Math.max(8,Math.min(92,100*(event.clientY-rect.top)/rect.height));
-    targetPosition(tool,[x,y]);
+  surface.id='placement';
+  surface.setAttribute('aria-describedby','place-tip');
+  const shadow=node('span','placement-shadow');
+  surface.append(shadow);
+  scene.append(ghost,surface);
+  const show=point=>{
+    previewPoint=point;
+    position(ghost,point);
+    ghost.style.zIndex='107';
+    position(shadow,point);
+  };
+  show(previewPoint);
+
+  function pointAt(event) {
+    const rect=surface.getBoundingClientRect();
+    return [
+      Math.max(0,Math.min(100,(event.clientX-rect.left)*100/rect.width)),
+      Math.max(0,Math.min(100,(event.clientY-rect.top)*100/rect.height)),
+    ];
+  }
+  let pointerType='mouse';
+  surface.addEventListener('pointerdown',event=>{pointerType=event.pointerType});
+  surface.addEventListener('pointermove',event=>{
+    if(event.pointerType==='mouse') show(pointAt(event));
   });
-  tool.addEventListener('pointerup',event => {
-    if(dragging?.id!==event.pointerId) return;
-    dragging=null;
-    if(!dragged) return;
-    const rect=target.getBoundingClientRect();
-    const distance=Math.hypot(event.clientX-(rect.left+rect.width/2),event.clientY-(rect.top+rect.height/2));
-    if(distance <= Math.max(38,rect.width*.75)) refresh(() => game.activate());
-    else render('next-control');
+  surface.addEventListener('keydown',event=>{
+    const offsets={ArrowLeft:[-2,0],ArrowRight:[2,0],ArrowUp:[0,-2],ArrowDown:[0,2]};
+    if(!offsets[event.key]) return;
+    event.preventDefault();
+    show(previewPoint.map((value,i)=>Math.max(0,Math.min(100,value+offsets[event.key][i]))));
   });
-  tool.addEventListener('pointercancel',() => render('next-control'));
+  surface.addEventListener('click',event=>{
+    const fromKeyboard=event.detail===0;
+    const point=fromKeyboard ? previewPoint : pointAt(event);
+    if(!fromKeyboard && pointerType!=='mouse') {
+      const rect=surface.getBoundingClientRect();
+      const near=lastTouch && Math.hypot((point[0]-lastTouch[0])*rect.width/100,
+        (point[1]-lastTouch[1])*rect.height/100)<32;
+      if(!near) {
+        lastTouch=point;
+        show(point);
+        document.querySelector('#place-tip').textContent='Коснись ещё раз, чтобы поставить.';
+        return;
+      }
+    }
+    const placed=fromKeyboard || pointerType==='mouse' ? point : lastTouch;
+    lastTouch=null;
+    refresh(()=>game.place(placed));
+  });
 }
 
 function garden(s) {
-  const scene = node('div','garden');
-  const dusk = ['finale','finished','view'].includes(s.phase);
-  const enchanted = dusk || s.objects.some(object => object.id==='magic') || s.animation?.effect==='wave';
+  const scene=node('div','garden');
+  const dusk=['finale','finished','view'].includes(s.phase);
+  const enchanted=dusk || s.objects.some(object=>object.id==='magic');
   scene.classList.toggle('dusk',dusk);
-  scene.classList.toggle('enchanted',enchanted);
   scene.classList.toggle('darken',s.phase==='finale');
   scene.append(node('div','landscape'));
-  const visible=[...s.objects,...(s.draft?.plot || s.draft?.id==='magic' && s.animation ? [s.draft] : [])];
-  for (const object of visible) {
-    const item = objectLayer(object,s);
-    if (item) scene.append(item);
+  for(const [i,object] of s.objects.entries()) {
+    const arriving=s.phase==='placing' && i===s.objects.length-1;
+    scene.append(objectLayer(object,{arriving}));
   }
-  if (enchanted) effectDots(scene,'glade-lights',23);
-  if (dusk) {
-    const fairy = sprite('objects',15);
-    fairy.classList.add('fairy');
-    const home = s.objects.find(object => object.id === 'house');
-    if (home) fairy.classList.add('inside');
-    fairy.style.setProperty('--fairy-x', (home ? plots[home.plot][0] : 57)+'%');
-    fairy.style.setProperty('--fairy-y', (home ? plots[home.plot][1]-9 : 46)+'%');
-    scene.append(fairy);
-  }
-  if (s.animation?.effect==='wave') scene.append(node('div','magic-wave'));
-  const fountains=visible
-    .filter(object => object.id==='fountain' && (object.effects.includes('flow') || s.animation?.effect==='flow'))
-    .map(object => ({point:plots[object.plot],size:sizes.fountain,
-      variant:rewardById.fountain.steps[0].options.indexOf(object.choices[0][0])}));
-  const pour=wateringEffects.has(s.animation?.effect) ? plots[s.draft.plot] : null;
-  if (s.draft?.plot && plantTypes.has(s.draft.id)) {
-    const earth=node('img','soil'+(pour?' wet':''));
-    earth.src=soil;
-    earth.alt='';
-    const point=plots[s.draft.plot];
-    targetPosition(earth,point);
-    earth.style.zIndex=point[1]-1;
-    earth.style.width=s.draft.id==='tree'?'8%':'10%';
-    scene.append(earth);
-  }
-  if (pour) {
-    const can=sprite('objects',14);
-    can.classList.add('pouring-can');
-    targetPosition(can,pour);
-    scene.append(can);
-  }
-  addWater(scene,{fountains,pour});
-  if(s.step?.kind==='act' && wateringEffects.has(s.step.effect)) {
-    wateringCan(scene,plots[s.draft.plot]);
-  }
-  if(s.step?.kind==='act' && s.step.effect==='flow') {
-    const [x,y]=plots[s.draft.plot];
-    const crystal=button('',()=>refresh(()=>game.activate()),{className:'water-crystal',aria:'Коснуться кристалла фонтана'});
-    crystal.id='next-control';
-    crystal.append(sprite('objects',10));
-    targetPosition(crystal,[x+8,y+4]);
-    scene.append(crystal);
-  }
-  if (s.step?.kind === 'place') {
-    s.step.plots.forEach((plot,index) => {
-      const spot = button('', () => refresh(() => game.place(plot), 'next-control'),
-        {className:'spot', aria:'Площадка '+(index+1)});
-      spot.style.left = plots[plot][0]+'%';
-      spot.style.top = plots[plot][1]+'%';
-      if (!index) spot.id = 'next-place';
-      scene.append(spot);
-    });
-  }
+  if(enchanted) effectDots(scene,'glade-lights',23);
+  const fairy=node('span','fairy-flight');
+  fairy.setAttribute('aria-hidden','true');
+  fairy.style.setProperty('--flight-delay', -(performance.now()/1000 % 13)+'s');
+  const wings=node('span','fairy-frames');
+  wings.style.backgroundImage='url("'+fairyArt+'")';
+  fairy.append(wings);
+  scene.append(fairy);
+  if(s.phase==='placing' && s.objects.at(-1)?.id==='magic') scene.append(node('div','magic-wave'));
+
+  const fountains=s.objects.filter(object=>object.id==='fountain').map(object=>({
+    point:object.point,size:sizes.fountain,variant:rewardById.fountain.options.indexOf(object.choices[0]),
+  }));
+  addWater(scene,fountains,groundAnchor);
+  if(s.phase==='garden' && s.draft.choices.length) enablePlacement(scene,s.draft);
   return scene;
 }
 
 function choiceTray(s) {
-  const step = s.step;
-  const tray = node('section','tray');
-  if (step.kind === 'act') {
-    if (wateringEffects.has(step.effect) || step.effect==='flow') return null;
-    const action = button(step.label, () => refresh(() => game.activate()), {className:'primary'});
-    action.id = 'next-control';
-    tray.append(action);
-    return tray;
-  }
-  tray.append(node('p','prompt',step.hint));
-  if (step.kind === 'place') return tray;
-  const options = node('div','options');
-  step.options.forEach((option,index) => {
-    const select = () => {
-      if (!step.multiple) {
-        refresh(() => game.choose(option),'next-control');
-        return;
+  const reward=rewardById[s.draft.id];
+  const choosing=s.draft.choices.length===0;
+  const tray=node('section','tray');
+  const prompt=node('p','prompt',choosing ? reward.choose : reward.place);
+  const touch=matchMedia('(pointer:coarse)').matches;
+  const tip=node('p','place-tip',choosing?'':touch
+    ? 'Коснись поляны для примерки, затем коснись того же места ещё раз.'
+    : 'Наведи мышь на поляну и щёлкни, чтобы поставить.');
+  tip.id='place-tip';
+  tip.setAttribute('aria-live','polite');
+  tray.append(prompt,tip);
+  const options=node('div','options');
+  reward.options.forEach((option,index)=>{
+    const tile=button('',()=>{
+      lastTouch=null;
+      refresh(()=>game.choose(option),'option-'+index);
+      if(!reward.multiple && matchMedia('(pointer:fine)').matches) {
+        document.querySelector('#placement')?.focus({preventScroll:true});
       }
-      multiple = multiple.includes(option) ? multiple.filter(item => item !== option) : [...multiple, option];
-      render('option-'+index);
-    };
-    const tile = button('',select,{className:'option',aria:option});
-    tile.id = index ? 'option-'+index : 'next-control';
-    if (step.multiple) {
-      tile.id = 'option-'+index;
-      tile.setAttribute('aria-pressed', String(multiple.includes(option)));
-    }
-    if (s.draft.step === 0 || s.reward === 'flowers' && step.multiple) tile.append(artFor(s.draft,index));
-    tile.append(node('span','',option));
+    },{className:'option',aria:option});
+    tile.id='option-'+index;
+    tile.setAttribute('aria-pressed',String(s.draft.choices.includes(option)));
+    tile.append(artFor(reward.id,index),node('span','',option));
     options.append(tile);
   });
-  if (step.multiple) options.append(button('Готово', () => {
-    if (game.choose(multiple)) {
-      multiple = [];
-      render('next-control');
-    }
-  },{className:'primary',disabled:!multiple.length}));
   tray.append(options);
   return tray;
 }
@@ -366,10 +314,7 @@ function play(s) {
   if (s.phase==='view') header.append(button('Играть ещё',
     () => refresh(() => game.restart(),'exercise-0')));
   board.append(header);
-  if (s.phase==='garden') {
-    const tray=choiceTray(s);
-    if(tray) board.append(tray);
-  }
+  if(s.phase==='garden') board.append(choiceTray(s));
   if (s.phase==='exercise' || s.phase==='finished') {
     const overlay = node('div','overlay');
     const card = node('section','activity');
@@ -377,8 +322,8 @@ function play(s) {
     card.setAttribute('aria-modal','true');
     card.setAttribute('aria-label',s.phase==='exercise'?exercises[s.exercise]:'Готовый сад');
     if (s.phase==='exercise') {
-      card.append(sprite('cards',s.exercise));
-      const done = button('Готово', () => refresh(() => game.done(),'next-control'), {className:'primary'});
+      card.append(cardArt(s.exercise));
+      const done = button('Готово', () => refresh(() => game.done(),'option-0'), {className:'primary'});
       done.id = 'done';
       card.append(done);
     } else {
@@ -395,13 +340,17 @@ function play(s) {
 
 function render(focusId) {
   const s = game.state;
+  if(s.index!==previewIndex || s.phase==='menu') {
+    previewIndex=s.index;
+    previewPoint=defaultPreview;
+    lastTouch=null;
+  }
   app.replaceChildren(s.phase==='menu' ? menu(s) : play(s));
-  if (focusId) (document.getElementById(focusId) ?? document.getElementById('next-place') ??
-    document.getElementById('option-0'))?.focus({preventScroll:true});
+  if (focusId) (document.getElementById(focusId) ?? document.getElementById('option-0'))?.focus({preventScroll:true});
   if (s.animation && !timer) {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const effect=s.animation.effect;
-    const duration = reduced ? 350 : effect === 'dusk' ? 3300 : wateringEffects.has(effect) ? 2520 : 1200;
+    const duration = reduced ? 90 : effect==='dusk' ? 2900 : 500;
     timer = setTimeout(() => {
       timer = null;
       refresh(() => game.completeAnimation(s.animation.token),'done');

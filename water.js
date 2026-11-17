@@ -4,6 +4,8 @@ const fountainShapes = [
   { source: [.51,.28], basin: [.50,.575], jets: [-.081,-.033,.028,.076], lift: .025, spread: .23, pool: .30 },
   { source: [.50,.085], basin: [.50,.237], jets: [-.108,-.055,0,.055,.108], lift: .046, spread: .14, pool: .18,
     tiers: [{source:[.30,.255],end:[.26,.542]},{source:[.70,.255],end:[.74,.542]}] },
+  { source: [.51,.236], basin: [.50,.469], jets: [-.14,-.075,0,.075,.14], lift: .055, spread: .25, pool: .32 },
+  { source: [.492,.365], basin: [.50,.605], jets: [-.037,-.014,.011,.033], lift: .003, spread: .12, pool: .235 },
 ];
 
 const mix = (a,b,t) => a+(b-a)*t;
@@ -108,24 +110,8 @@ function drawFountain(ctx,{x,y,size,variant},time) {
   ctx.globalAlpha=1;
 }
 
-function drawPour(ctx,{target,can},elapsed) {
-  if(elapsed < .31 || elapsed > 1.45) return;
-  const strength=Math.min(1,(elapsed-.31)*8,(1.45-elapsed)*5);
-  const [x,y,scale]=target;
-  const [cx,cy]=can;
-  const source=[cx+scale*.44,cy+scale*.055];
-  for(let i=0;i<6;i++) {
-    const spread=i-2.5;
-    trace(ctx,[source[0]+spread*scale*.012,source[1]+spread*scale*.006],
-      [x+spread*scale*.064,y+spread*scale*.018],scale*.011,elapsed*2+i*.1,
-      strength,Math.max(.62,scale*.013),{horizontal:true});
-  }
-  ctx.globalAlpha=1;
-  ripples(ctx,x,y,scale*.16,elapsed*2,strength*.8);
-}
-
-export function addWater(scene,{fountains,pour}) {
-  if(!fountains.length&&!pour) return;
+export function addWater(scene,fountains,groundAnchor) {
+  if(!fountains.length) return;
   const canvas=document.createElement('canvas');
   canvas.className='water-canvas';
   canvas.setAttribute('aria-hidden','true');
@@ -134,10 +120,8 @@ export function addWater(scene,{fountains,pour}) {
   if(!ctx) return;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const dpr=Math.min(2,window.devicePixelRatio || 1);
-  let start;
   function frame(now) {
     if(!scene.isConnected) return;
-    start??=now;
     const width=scene.clientWidth;
     const height=scene.clientHeight;
     if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)) {
@@ -146,16 +130,10 @@ export function addWater(scene,{fountains,pour}) {
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,width,height);
-    const elapsed=(now-start)/1000;
     for(const {point,size,variant} of fountains) {
       const scale=width*size/100;
-      drawFountain(ctx,{x:width*point[0]/100-scale*.5,y:height*point[1]/100-scale*.77,
+      drawFountain(ctx,{x:width*point[0]/100-scale*.5,y:height*point[1]/100-scale*groundAnchor,
         size:scale,variant},reduced?.25:now/1000);
-    }
-    if(pour) {
-      const scale=width*.125;
-      const [x,y]=[pour[0]*width/100,pour[1]*height/100];
-      drawPour(ctx,{target:[x,y,scale],can:[x-scale*.56,y-scale*.63]},reduced?.7:elapsed);
     }
     if(!reduced) requestAnimationFrame(frame);
   }
