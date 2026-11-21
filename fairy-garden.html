@@ -206,11 +206,10 @@ button:hover:not(:disabled) {background:#214958}
 
 /* The meadow fills the available play area, including in portrait orientation. */
 .board {grid-template-rows:minmax(0,1fr)}
-.board[data-phase="garden"] {grid-template-rows:minmax(0,1fr) var(--dock)}
+.board[data-phase="garden"],.board[data-phase="decorations"] {grid-template-rows:minmax(0,1fr) var(--dock)}
 .garden {width:100%;height:100%;aspect-ratio:auto;margin:0}
 .landscape {background-size:cover}
-.fullscreen {position:fixed;z-index:150;top:max(10px,env(safe-area-inset-top));right:12px;font-size:.84rem;background:#183b41f2}
-.hud {right:145px;gap:.5rem;align-items:start}
+.hud {right:12px;gap:.5rem;align-items:start}
 .menu {width:100%;min-height:100dvh;margin:0;border:0;border-radius:0;box-shadow:none;padding:clamp(3.1rem,7vh,4.6rem) clamp(.75rem,3vw,3rem) 1.4rem;background:linear-gradient(#113337ab,#0c302dac),var(--forest) center/cover}
 .menu h1 {color:#fff0d4;text-shadow:0 2px 10px #0b252b}
 .instruction,.selection-count {color:#fff6e2}
@@ -229,8 +228,8 @@ button:hover:not(:disabled) {background:#214958}
   .card-grid {grid-template-columns:repeat(3,minmax(0,1fr))}
   .menu {padding-top:3.4rem}
   .card-label {font-size:.81rem}
-  .hud {right:116px}
-  .hud button,.fullscreen {font-size:.77rem;padding:.35rem .5rem}
+  .hud {right:12px}
+  .hud button {font-size:.77rem;padding:.35rem .5rem}
 }
 @media (min-resolution:1.75dppx) {
   .activity img.card-art {width:min(74vw,55dvh,313px)}
@@ -365,16 +364,32 @@ class GardenGame {
     return true;
   }
 
-  repeatExercise() {
-    if (this.#state.phase!=='garden') return false;
-    this.#state.phase='exercise';
+  startDecorating() {
+    if (this.#state.phase!=='offer') return false;
+    this.#state.phase='decorations';
+    return true;
+  }
+
+  pickDecoration(id) {
+    const s=this.#state;
+    if(s.phase!=='decorations' || !rewards.some(r=>r.id===id) || s.objects.some(o=>o.id===id)) return false;
+    s.draft={id,choices:[],point:null};
+    s.phase='garden';
+    return true;
+  }
+
+  finishGarden() {
+    const s=this.#state;
+    if(!['offer','decorations','garden'].includes(s.phase) || s.index<s.selected.length) return false;
+    s.draft=null;
+    s.phase='view';
     return true;
   }
 
   choose(value) {
     const s = this.#state;
     if (s.phase!=='garden') return false;
-    const reward = rewards[s.index];
+    const reward = rewards.find(r=>r.id===s.draft.id);
     if (!reward.options.includes(value)) return false;
     const index=s.draft.choices.indexOf(value);
     if (!reward.multiple) s.draft.choices=[value];
@@ -399,7 +414,13 @@ class GardenGame {
     s.animation=null;
     if (s.phase==='finale') {
       s.phase='finished';
+    } else if (s.index===s.selected.length) {
+      s.phase=s.objects.length<rewards.length?'decorations':'view';
     } else if (++s.index===s.selected.length) {
+      if(s.objects.length<rewards.length) {
+        s.phase='offer';
+        return true;
+      }
       s.phase='finale';
       s.animation={token:++this.#animationId,effect:'dusk'};
     } else {
@@ -964,27 +985,49 @@ function play(s) {
   board.append(frame);
   const header = node('header','hud');
   header.append(node('span','progress', Math.min(s.index+1,s.selected.length)+' / '+s.selected.length));
-  if (s.phase==='garden') header.append(button('Повторить карточку',
-    () => refresh(() => game.repeatExercise(),'done')));
-  if (s.phase==='view') header.append(button('Играть ещё',
-    () => refresh(() => game.restart(),'exercise-0')));
+  if(s.index===s.selected.length && ['decorations','garden'].includes(s.phase)) {
+    header.append(button('Закончить',()=>refresh(()=>game.finishGarden(),'restart')));
+  }
+  if (s.phase==='view') {
+    const again=button('Играть ещё',()=>refresh(()=>game.restart(),'exercise-0'));
+    again.id='restart';
+    header.append(again);
+  }
   board.append(header);
   if(s.phase==='garden') board.append(choiceTray(s));
+  if(s.phase==='decorations') {
+    const tray=node('section','tray');
+    const options=node('div','options');
+    for(const reward of rewards.filter(r=>!s.objects.some(o=>o.id===r.id))) {
+      const tile=button('',()=>refresh(()=>game.pickDecoration(reward.id),'option-0'),{className:'option',aria:reward.name});
+      if(!options.childElementCount) tile.id='first-decoration';
+      tile.append(artFor(reward.id,0),node('span','',reward.name));
+      options.append(tile);
+    }
+    tray.append(node('p','prompt','Что добавим в сад?'),options);
+    board.append(tray);
+  }
   if(s.phase==='placing') {
     const placed=s.objects.at(-1);
     board.append(node('div','tray placement-result',placed.choices.join(' · ')));
   }
-  if (s.phase==='exercise' || s.phase==='finished') {
+  if (['exercise','offer','finished'].includes(s.phase)) {
     const overlay = node('div','overlay');
     const card = node('section','activity');
     card.setAttribute('role','dialog');
     card.setAttribute('aria-modal','true');
-    card.setAttribute('aria-label',s.phase==='exercise'?exercises[s.exercise]:'Готовый сад');
+    card.setAttribute('aria-label',s.phase==='exercise'?exercises[s.exercise]:s.phase==='offer'?'Все упражнения выполнены':'Готовый сад');
     if (s.phase==='exercise') {
       card.append(cardArt(s.exercise),node('h2','exercise-name',exercises[s.exercise]));
       const done = button('Готово', () => refresh(() => game.done(),'option-0'), {className:'primary'});
       done.id = 'done';
       card.append(done);
+    } else if(s.phase==='offer') {
+      const actions=node('div','final-actions');
+      const yes=button('Да',()=>refresh(()=>game.startDecorating(),'first-decoration'),{className:'primary'});
+      yes.id='yes';
+      actions.append(yes,button('Нет',()=>refresh(()=>game.finishGarden(),'restart')));
+      card.append(node('h2','','Все упражнения выполнены!'),node('p','','Хочешь просто так добавить в сад ещё предметы?'),actions);
     } else {
       const actions = node('div','final-actions');
       actions.append(button('Посмотреть сад', () => refresh(() => game.viewGarden()), {className:'primary'}),
@@ -1000,13 +1043,13 @@ function play(s) {
 function render(focusId) {
   const s = game.state;
   if(s.phase==='menu') butterflyStartedAt=null;
-  if(s.index!==previewIndex || s.phase==='menu') {
+  if(s.index!==previewIndex || s.phase==='menu' || s.phase==='decorations') {
     previewIndex=s.index;
     previewPoint=defaultPreview;
     lastTouch=null;
   }
   app.replaceChildren(s.phase==='menu' ? menu(s) : play(s));
-  if (focusId) (document.getElementById(focusId) ?? document.getElementById('option-0'))?.focus({preventScroll:true});
+  if (focusId) (document.getElementById(focusId) ?? document.getElementById('yes') ?? document.getElementById('first-decoration') ?? document.getElementById('option-0') ?? document.getElementById('restart'))?.focus({preventScroll:true});
   if (s.animation && !timer) {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const effect=s.animation.effect;
@@ -1017,21 +1060,6 @@ function render(focusId) {
     },duration);
   }
 }
-const fullscreen=button('На весь экран',async()=>{
-  try {
-    if(document.fullscreenElement) await document.exitFullscreen();
-    else await document.documentElement.requestFullscreen();
-  } catch {
-    fullscreen.hidden=true;
-  }
-},{className:'fullscreen'});
-fullscreen.hidden=!document.fullscreenEnabled;
-document.body.append(fullscreen);
-document.addEventListener('fullscreenchange',()=>{
-  const label=document.fullscreenElement?'Свернуть экран':'На весь экран';
-  fullscreen.textContent=label;
-  fullscreen.setAttribute('aria-label',label);
-});
 render();
 </script>
 </html>
